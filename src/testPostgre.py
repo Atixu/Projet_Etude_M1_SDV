@@ -2,25 +2,18 @@
 import os
 import json
 import urllib.request
+from dotenv import load_dotenv
 from datetime import datetime, timezone
 
 from pymongo import MongoClient, UpdateOne
 
-# =========================
-# CONFIG 
-# =========================
-BSKY_IDENTIFIER = "atixu.bsky.social"
-BSKY_APP_PASSWORD = "nayw-y7ol-vgn2-fu6e"
-
-MONGO_URI = "mongodb+srv://Atixu:AtLAO9ddWIkac24K@projetm1data.2o1upoi.mongodb.net/"
-DB_NAME = "ProjetM1Data"
-COLLECTION_RAW = "posts_raw"
+load_dotenv()
 
 # =========================
 # 1) LOGIN BLUESKY
 # =========================
 login_url = "https://bsky.social/xrpc/com.atproto.server.createSession"
-login_data = {"identifier": BSKY_IDENTIFIER, "password": BSKY_APP_PASSWORD}
+login_data = {"identifier": os.getenv('BSKY_IDENTIFIER'), "password": os.getenv('BSKY_APP_PASSWORD')}
 
 req = urllib.request.Request(
     login_url,
@@ -53,10 +46,10 @@ print("Posts reçus :", len(feed))
 # =========================
 # 3) CONNECT MONGO
 # =========================
-client = MongoClient(MONGO_URI)
-col = client[DB_NAME][COLLECTION_RAW]
+client = MongoClient(os.getenv('MONGO_URI'))
+col = client[os.getenv('DB_NAME')][os.getenv('COLLECTION_RAW')]
 
-# (Recommandé) index unique pour éviter les doublons
+
 # uri est un bon identifiant stable côté ATProto
 col.create_index("uri", unique=True)
 
