@@ -11,5 +11,5 @@ with DAG(
 
     run_script = BashOperator(
         task_id="run_pipeline",
-        bash_command="python /opt/project/src/getapi.py",
+        bash_command="python /opt/project/src/getAPI.py",
     )
