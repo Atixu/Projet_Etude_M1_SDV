@@ -1,2 +1,14 @@
 ProjetEtude/
 .env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Airflow
+airflow/logs/
+airflow/plugins/__pycache__/
+
+# Env
+.env
