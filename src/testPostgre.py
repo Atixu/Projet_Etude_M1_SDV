@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pymongo import MongoClient, UpdateOne
 
 # =========================
-# CONFIG (mets ça en variables d'env si possible)
+# CONFIG 
 # =========================
 BSKY_IDENTIFIER = "atixu.bsky.social"
 BSKY_APP_PASSWORD = "nayw-y7ol-vgn2-fu6e"
