@@ -1,0 +1,20 @@
+[project]
+name = "Projet_Etude_M1_SDV"
+version = "0.1.0"
+description = "Un projet Python basique"
+authors = [
+    { name = "Guillaume Reault", email = "guillaume@example.com" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+
+# Dépendances du projet
+dependencies = [
+    urllib.request,
+    pymongo,
+    dotenv
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
