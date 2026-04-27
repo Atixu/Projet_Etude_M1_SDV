@@ -1,6 +1,6 @@
 # Projet Thumalien — Fake News Detection on Bluesky
 
-Projet M1 Big Data & IA — SDV 2025  
+Projet M1 Big Data & IA — SDV 2025-2026 - William BELLON & Guillaume REAULT  
 Détection automatique de désinformation sur le réseau social **Bluesky**, combinant classification NLP, analyse émotionnelle et un dashboard interactif.
 
 ---
