@@ -15,9 +15,11 @@ Détection automatique de désinformation sur le réseau social **Bluesky**, com
 6. [Lancement rapide](#lancement-rapide)
 7. [Pipeline détaillé](#pipeline-détaillé)
 8. [Dashboard](#dashboard)
-9. [Structure du projet](#structure-du-projet)
-10. [Documentation interne](#documentation-interne)
-11. [Règles de sécurité](#règles-de-sécurité)
+9. [Agent IA (gratuit)](#agent-ia-gratuit)
+10. [Structure du projet](#structure-du-projet)
+11. [Documentation interne](#documentation-interne)
+12. [Règles de sécurité](#règles-de-sécurité)
+13. [Dépannage rapide](#dépannage-rapide)
 
 ---
 
@@ -72,6 +74,7 @@ Streamlit Dashboard         ← dashboard_app.py
 - HuggingFace `datasets` (données d'entraînement)
 - vaderSentiment (analyse de sentiment)
 - Streamlit + Plotly (dashboard)
+- Groq API + Llama 3.1 (chatbot IA gratuit)
 - Airflow (orchestration, optionnel)
 
 ---
@@ -143,7 +146,10 @@ BLUESKY_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
 
 # MongoDB
 MONGO_URI=mongodb://localhost:27017
-MONGO_DB=bluesky_db
+MONGO_DB=bluesky
+
+# Agent IA (gratuit)
+GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 > **Important :** Ne jamais committer `.env`. Il est listé dans `.gitignore`.
@@ -250,6 +256,34 @@ Accès : http://localhost:8501
 - Série temporelle des posts
 - Filtres : langue, niveau d'alerte, émotion, date, texte libre
 - Vue détaillée par post avec breakdown du score
+- Onglet chat IA pour questionner les tendances (Groq, modèle `llama-3.1-8b-instant`)
+
+---
+
+## Agent IA (gratuit)
+
+Le dashboard inclut un onglet **🤖 Agent IA** qui répond en français à partir d'un résumé des données MongoDB:
+- volume de posts,
+- distribution low/medium/high,
+- émotions dominantes,
+- langues,
+- exemples de posts à forte alerte.
+
+### Activation
+
+1. Créer une API key gratuite sur https://console.groq.com
+2. Ajouter `GROQ_API_KEY` dans `.env`
+3. Relancer Streamlit:
+
+```bash
+streamlit run src/dashboard_app.py
+```
+
+### Exemples de questions
+
+- "Combien de posts sont en alerte high ?"
+- "Quelles émotions dominent cette semaine ?"
+- "Résume les tendances de désinformation en français"
 
 ---
 
@@ -301,3 +335,19 @@ Projet_Etude_M1_SDV/
 - Ne **jamais** écrire de mot de passe ou token en dur dans le code
 - Utiliser des **App Passwords** Bluesky (révocables), jamais le mot de passe principal
 - Les credentials MongoDB en production doivent utiliser l'authentification
+
+---
+
+## Dépannage rapide
+
+- Erreur MongoDB `ServerSelectionTimeoutError`:
+
+```bash
+docker start m1-mongo
+```
+
+- Docker daemon non disponible sous Windows:
+    ouvrir Docker Desktop puis relancer la commande.
+
+- L'onglet IA affiche une erreur modèle Groq:
+    vérifier que `GROQ_API_KEY` est bien défini, puis utiliser le modèle actuel déjà configuré (`llama-3.1-8b-instant`).

@@ -240,7 +240,7 @@ def render_chat(df: pd.DataFrame) -> None:
                     *st.session_state.chat_history,
                 ]
                 response = client.chat.completions.create(
-                    model="llama3-8b-8192",
+                    model="llama-3.1-8b-instant",
                     messages=messages,
                     max_tokens=512,
                     temperature=0.3,
