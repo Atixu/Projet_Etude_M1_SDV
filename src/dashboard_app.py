@@ -1,4 +1,4 @@
-"""Partie 6 - Dashboard MVP (Streamlit).
+"""Partie 6 - Dashboard MVP (Streamlit) avec Agent IA (Groq/Llama3).
 
 Run:
     streamlit run src/dashboard_app.py
@@ -154,6 +154,111 @@ def render_charts(df: pd.DataFrame) -> None:
         st.plotly_chart(fig_time, width="stretch")
 
 
+def build_data_context(df: pd.DataFrame) -> str:
+    """Construit un résumé textuel des données pour le prompt système du LLM."""
+    if df.empty:
+        return "Aucune donnée disponible dans la base."
+
+    total = len(df)
+    alert_counts = df["final_alert_level"].value_counts().to_dict() if "final_alert_level" in df.columns else {}
+    emotion_counts = df["dominant_emotion"].value_counts().head(6).to_dict() if "dominant_emotion" in df.columns else {}
+    lang_counts = df["lang"].value_counts().to_dict() if "lang" in df.columns else {}
+    avg_score = float(df["final_credibility_score"].mean()) if "final_credibility_score" in df.columns else 0.0
+    top_terms = df["search_term"].value_counts().head(5).to_dict() if "search_term" in df.columns else {}
+
+    high_posts = df[df["final_alert_level"] == "high"][["text", "explanation_text"]].head(3).to_dict("records") if "final_alert_level" in df.columns else []
+    examples_text = "\n".join(
+        f"  - \"{p.get('text', '')[:120]}...\" → {p.get('explanation_text', '')}"
+        for p in high_posts
+    )
+
+    return f"""Tu es l'assistant IA du système Thumalien, un outil de détection de fake news sur Bluesky.
+Tu analyses les posts collectés et tu aides les utilisateurs à comprendre les tendances de désinformation.
+
+Données actuelles dans la base :
+- Total posts analysés : {total}
+- Répartition des alertes : {alert_counts}  (high = forte probabilité fake news)
+- Score de crédibilité moyen : {avg_score:.3f}  (0 = très crédible, 1 = probablement fake)
+- Émotions dominantes : {emotion_counts}
+- Langues : {lang_counts}
+- Mots-clés surveillés (top 5) : {top_terms}
+
+Exemples de posts à forte alerte :
+{examples_text}
+
+Réponds toujours en français, de façon concise et factuelle. Si on te demande quelque chose hors de ce périmètre, redirige poliment vers les données disponibles."""
+
+
+def render_chat(df: pd.DataFrame) -> None:
+    """Onglet Agent IA — chatbot Groq/Llama3."""
+    st.subheader("🤖 Agent IA — Analyse Thumalien")
+    st.caption("Posez des questions sur les données de désinformation collectées sur Bluesky.")
+
+    _load_environment()
+    groq_api_key = os.getenv("GROQ_API_KEY", "")
+    if not groq_api_key:
+        st.warning(
+            "Clé Groq manquante. Ajoute `GROQ_API_KEY=...` dans ton fichier `.env`.\n\n"
+            "Crée un compte gratuit sur [console.groq.com](https://console.groq.com) → API Keys."
+        )
+        return
+
+    try:
+        from groq import Groq  # noqa: PLC0415
+    except ImportError:
+        st.error("`groq` non installé. Lance : `pip install groq`")
+        return
+
+    system_prompt = build_data_context(df)
+
+    # Initialise l'historique dans la session
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    # Affiche l'historique
+    for msg in st.session_state.chat_history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # Input utilisateur
+    user_input = st.chat_input("Ex: Combien de posts sont en alerte high ? Quelles émotions dominent ?")
+    if not user_input:
+        return
+
+    # Affiche la question
+    st.session_state.chat_history.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    # Appel Groq
+    with st.chat_message("assistant"):
+        with st.spinner("Analyse en cours..."):
+            try:
+                client = Groq(api_key=groq_api_key)
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    *st.session_state.chat_history,
+                ]
+                response = client.chat.completions.create(
+                    model="llama3-8b-8192",
+                    messages=messages,
+                    max_tokens=512,
+                    temperature=0.3,
+                )
+                answer = response.choices[0].message.content
+            except Exception as exc:  # noqa: BLE001
+                answer = f"❌ Erreur lors de l'appel Groq : {exc}"
+
+        st.markdown(answer)
+        st.session_state.chat_history.append({"role": "assistant", "content": answer})
+
+    # Bouton reset
+    if st.session_state.chat_history:
+        if st.button("🗑️ Effacer la conversation", key="clear_chat"):
+            st.session_state.chat_history = []
+            st.rerun()
+
+
 def main() -> None:
     st.set_page_config(
         page_title="Thumalien - Dashboard MVP",
@@ -169,6 +274,9 @@ def main() -> None:
         st.warning("Aucune donnee disponible dans posts_clean.")
         st.stop()
 
+    tab1, tab2 = st.tabs(["📊 Dashboard", "🤖 Agent IA"])
+
+    # ---- Sidebar filters (affect tab1 only) ----
     st.sidebar.header("Filtres")
 
     languages = sorted(df["lang"].dropna().unique().tolist())
@@ -219,51 +327,55 @@ def main() -> None:
         )
         filtered = filtered[mask]
 
-    st.subheader("Vue synthese")
-    render_kpis(filtered)
-    render_charts(filtered)
+    with tab1:
+        st.subheader("Vue synthese")
+        render_kpis(filtered)
+        render_charts(filtered)
 
-    st.subheader("Vue detail")
+        st.subheader("Vue detail")
 
-    display_cols = [
-        "uri",
-        "created_at",
-        "lang",
-        "search_term",
-        "final_alert_level",
-        "final_credibility_score",
-        "predicted_label",
-        "sentiment_label",
-        "dominant_emotion",
-    ]
+        display_cols = [
+            "uri",
+            "created_at",
+            "lang",
+            "search_term",
+            "final_alert_level",
+            "final_credibility_score",
+            "predicted_label",
+            "sentiment_label",
+            "dominant_emotion",
+        ]
 
-    existing_display_cols = [c for c in display_cols if c in filtered.columns]
-    st.dataframe(
-        filtered[existing_display_cols].sort_values(
-            by=["final_alert_level", "final_credibility_score"],
-            ascending=[True, True],
-        ),
-        width="stretch",
-        height=420,
-    )
+        existing_display_cols = [c for c in display_cols if c in filtered.columns]
+        st.dataframe(
+            filtered[existing_display_cols].sort_values(
+                by=["final_alert_level", "final_credibility_score"],
+                ascending=[True, True],
+            ),
+            width="stretch",
+            height=420,
+        )
 
-    st.markdown("---")
-    st.markdown("### Post selectionne")
+        st.markdown("---")
+        st.markdown("### Post selectionne")
 
-    selected_uri = st.selectbox("URI", options=filtered["uri"].tolist())
-    selected = filtered[filtered["uri"] == selected_uri].iloc[0]
+        selected_uri = st.selectbox("URI", options=filtered["uri"].tolist())
+        selected = filtered[filtered["uri"] == selected_uri].iloc[0]
 
-    st.write("**Texte original**")
-    st.write(selected.get("text", ""))
+        st.write("**Texte original**")
+        st.write(selected.get("text", ""))
 
-    st.write("**Explication**")
-    st.write(selected.get("explanation_text", ""))
+        st.write("**Explication**")
+        st.write(selected.get("explanation_text", ""))
 
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Score final", f"{selected.get('final_credibility_score', 0.0):.3f}")
-    m2.metric("Alerte", str(selected.get("final_alert_level", "unknown")))
-    m3.metric("Sentiment", str(selected.get("sentiment_label", "unknown")))
-    m4.metric("Emotion", str(selected.get("dominant_emotion", "unknown")))
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Score final", f"{selected.get('final_credibility_score', 0.0):.3f}")
+        m2.metric("Alerte", str(selected.get("final_alert_level", "unknown")))
+        m3.metric("Sentiment", str(selected.get("sentiment_label", "unknown")))
+        m4.metric("Emotion", str(selected.get("dominant_emotion", "unknown")))
+
+    with tab2:
+        render_chat(df)
 
 
 if __name__ == "__main__":
