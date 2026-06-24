@@ -269,12 +269,14 @@ def main() -> None:
     clean_col_name = os.getenv("MONGO_COLLECTION_CLEAN", "posts_clean")
     model_dir = Path(os.getenv("BASELINE_MODEL_DIR", "models"))
 
-    # Entrainement
+    # Entrainement (Partie 7 - mesure energetique)
     texts, labels = load_training_data()
-    pipe = train_and_evaluate(texts, labels, model_dir)
+    with track_energy("baseline_training", n_samples=len(texts)):
+        pipe = train_and_evaluate(texts, labels, model_dir)
 
-    # Scoring des posts Bluesky
-    score_bluesky_posts(pipe, mongo_uri, db_name, clean_col_name)
+    # Scoring des posts Bluesky (Partie 7 - mesure energetique inference)
+    with track_energy("baseline_inference"):
+        score_bluesky_posts(pipe, mongo_uri, db_name, clean_col_name)
 
 
 if __name__ == "__main__":

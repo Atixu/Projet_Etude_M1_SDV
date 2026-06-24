@@ -2,6 +2,26 @@
 
 Date: 2026-04-27
 
+""" Indications obtenues entre temps :
+
+1) Formuuler le problème, l'objectif
+  -> milliers de tweets variés (news)
+  classer les tweets selon leur contenu (=NLP) (fake news ou non)
+  -> classification
+2) Défiir les données
+tweet : Un message texte court numérisé créé par un utilisateurs (humain/robot)
+3) Nettoyage 
+Comment nettoyer les fautes ? Modèles OUI ? / Algorithme
+ -> lemmatisation
+ Ponctuation ? Non
+ Rey Ex ? Préciser 
+ Minuscule ? oui
+4) Choix du modèle : Classification / Analyse de sentiment -> BERT(Encoding)
+                      entrainé sur quelles données
+5) Tester le modèle 
+-> on regarde le comportmeent sur une petite partie 
+-> labéliser et comparer
+
 ## 1. Objectif du projet
 Detection de fake news sur Bluesky avec pipeline NLP, score de credibilite, analyse emotionnelle, dashboard MVP, et suivi Green IT (a finaliser).
 
