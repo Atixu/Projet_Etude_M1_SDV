@@ -37,6 +37,7 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
+from codecarbon import EmissionsTracker
 
 PIPELINE_VERSION = "baseline_tfidf_logreg_v1"
 
@@ -127,9 +128,17 @@ def train_and_evaluate(
     logging.info("Training: train=%s test=%s", len(X_train), len(X_test))
 
     pipe = build_pipeline()
-    pipe.fit(X_train, y_train)
+    model_dir.mkdir(parents=True, exist_ok=True)
+    with EmissionsTracker(
+        output_dir=str(model_dir),
+        project_name="baseline_training",
+        log_level="error",
+    ) as tracker:
+        pipe.fit(X_train, y_train)
+        y_pred = pipe.predict(X_test)
+    emissions_kg = tracker.final_emissions
+    logging.info("Training CO2 emissions: %.6f kgCO2eq", emissions_kg)
 
-    y_pred = pipe.predict(X_test)
     f1 = f1_score(y_test, y_pred, average="weighted")
 
     logging.info("=== Evaluation baseline ===")
@@ -146,7 +155,6 @@ def train_and_evaluate(
     logging.info("Confusion matrix (fake/real):\n%s", cm)
 
     # Sauvegarde modele
-    model_dir.mkdir(parents=True, exist_ok=True)
     model_path = model_dir / "baseline_tfidf_logreg.joblib"
     joblib.dump(pipe, model_path)
     logging.info("Model saved: %s", model_path)
@@ -157,7 +165,8 @@ def train_and_evaluate(
         f.write(f"Pipeline: {PIPELINE_VERSION}\n")
         f.write(f"Date: {datetime.now(timezone.utc).isoformat()}\n")
         f.write(f"Train size: {len(X_train)} | Test size: {len(X_test)}\n")
-        f.write(f"F1 weighted: {f1:.4f}\n\n")
+        f.write(f"F1 weighted: {f1:.4f}\n")
+        f.write(f"CO2 emissions (training): {emissions_kg:.6f} kgCO2eq\n\n")
         f.write(report)
         f.write(f"\nConfusion matrix:\n{cm}\n")
     logging.info("Evaluation report saved: %s", report_path)

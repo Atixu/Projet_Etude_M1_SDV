@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from pymongo import MongoClient, UpdateOne
 from pymongo.errors import BulkWriteError
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from codecarbon import EmissionsTracker
 
 from emotion_analysis import dominant_emotion, emotion_scores
 
@@ -80,6 +81,15 @@ def main() -> None:
     analyzer = SentimentIntensityAnalyzer()
     scored_at = datetime.now(timezone.utc).isoformat()
 
+    emissions_dir = Path(os.getenv("BASELINE_MODEL_DIR", "models"))
+    emissions_dir.mkdir(parents=True, exist_ok=True)
+    tracker = EmissionsTracker(
+        output_dir=str(emissions_dir),
+        project_name="emotion_analysis",
+        log_level="error",
+    )
+    tracker.start()
+
     cursor = col.find({}, {"uri": 1, "clean_text": 1, "text": 1})
 
     ops: list[UpdateOne] = []
@@ -125,6 +135,9 @@ def main() -> None:
 
     if ops:
         _bulk(col, ops)
+
+    emissions_kg = tracker.stop()
+    logging.info("Emotion analysis CO2 emissions: %.6f kgCO2eq", emissions_kg)
 
     high_neg = col.count_documents({"sentiment_label": "negative"})
     pos = col.count_documents({"sentiment_label": "positive"})

@@ -24,7 +24,8 @@ env/
 # Local runtime outputs
 airflow/logs/
 airflow/plugins/__pycache__/
-models/
+models/*
+!models/emissions.csv
 
 # OS/editor
 .DS_Store

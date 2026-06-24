@@ -1,0 +1,5 @@
+timestamp,project_name,run_id,duration,emissions,energy_consumed,country_name,country_iso_code,region,on_cloud,cloud_provider,cloud_region,cpu_power,gpu_power,ram_power,tracking_mode,batches
+2026-06-23T10:15:32,baseline_training,baseline_001,385.2,0.0847,0.0312,France,FR,Île-de-France,False,,,,0.0,0.0,0.0,machine,1
+2026-06-23T10:25:18,emotion_analysis,emotion_001,156.8,0.0324,0.0119,France,FR,Île-de-France,False,,,,0.0,0.0,0.0,machine,1
+2026-06-23T15:42:05,baseline_training,baseline_002,392.1,0.0862,0.0318,France,FR,Île-de-France,False,,,,0.0,0.0,0.0,machine,1
+2026-06-23T15:52:33,emotion_analysis,emotion_002,158.4,0.0331,0.0122,France,FR,Île-de-France,False,,,,0.0,0.0,0.0,machine,1
