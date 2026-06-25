@@ -14,12 +14,14 @@ Détection automatique de désinformation sur le réseau social **Bluesky**, com
 5. [Configuration](#configuration)
 6. [Lancement rapide](#lancement-rapide)
 7. [Pipeline détaillé](#pipeline-détaillé)
-8. [Dashboard](#dashboard)
-9. [Agent IA (gratuit)](#agent-ia-gratuit)
-10. [Structure du projet](#structure-du-projet)
-11. [Documentation interne](#documentation-interne)
-12. [Règles de sécurité](#règles-de-sécurité)
-13. [Dépannage rapide](#dépannage-rapide)
+8. [Pipeline Kedro (NLP)](#pipeline-kedro-nlp)
+9. [Airflow (orchestration)](#airflow-orchestration)
+10. [Dashboard](#dashboard)
+11. [Agent IA (gratuit)](#agent-ia-gratuit)
+12. [Structure du projet](#structure-du-projet)
+13. [Documentation interne](#documentation-interne)
+14. [Règles de sécurité](#règles-de-sécurité)
+15. [Dépannage rapide](#dépannage-rapide)
 
 ---
 
@@ -27,10 +29,10 @@ Détection automatique de désinformation sur le réseau social **Bluesky**, com
 
 Le projet collecte des posts Bluesky via l'API officielle, les nettoie, les classe (fake / real) avec un modèle TF-IDF + Régression Logistique entraîné sur 40 000 articles labellisés (HuggingFace `GonzaloA/fake_news`), analyse leur tonalité émotionnelle (VADER + lexique custom), puis produit un **score de crédibilité final** et l'affiche dans un dashboard Streamlit.
 
-| Étape | Script | Sortie |
+| Étape | Outil | Sortie |
 |---|---|---|
-| 1. Collecte | `src/getapi.py` | MongoDB `posts_raw` |
-| 2. Nettoyage NLP | `src/run_nlp_cleaning.py` | MongoDB `posts_clean` |
+| 1. Collecte | `src/getapi.py` (Jetstream WebSocket) | MongoDB `posts_raw` |
+| 2. Nettoyage NLP | **Kedro** `etl-bluesky/` (7 nodes) | MongoDB `posts_clean_kedro` |
 | 3. Classification fake news | `src/run_baseline.py` | champ `credibility_score` + `alert_level` |
 | 4. Émotions | `src/run_emotion_analysis.py` | champ `emotion_scores` + `dominant_emotion` |
 | 5. Score final | `src/run_final_scoring.py` | champ `final_credibility_score` + `explanation_text` |
@@ -68,14 +70,19 @@ Streamlit Dashboard         ← dashboard_app.py
 ```
 
 **Stack technique :**
-- Python 3.11+
+- Python 3.12
 - MongoDB 7 (via Docker)
+- **Kedro 1.2** — pipeline NLP structuré (7 nodes, catalog, parameters)
+- **Apache Airflow** — orchestration DAG quotidien (collecte → NLP)
+- **GitHub Actions** — CI/CD : tests unitaires + lint sur chaque push
 - scikit-learn (TF-IDF + LogisticRegression)
 - HuggingFace `datasets` (données d'entraînement)
+- langdetect (détection langue réelle sur le contenu)
+- NLTK (tokenisation + lemmatisation WordNet)
 - vaderSentiment (analyse de sentiment)
 - Streamlit + Plotly (dashboard)
 - Groq API + Llama 3.1 (chatbot IA gratuit)
-- Airflow (orchestration, optionnel)
+- CodeCarbon (monitoring empreinte carbone)
 
 ---
 
@@ -197,13 +204,30 @@ python src/getapi.py
 
 Collecte des posts via `app.bsky.feed.searchPosts` sur une liste de mots-clés (fake news, désinformation, hoax, etc.) en français et en anglais. Stocke dans MongoDB collection `posts_raw`.
 
-### Étape 2 — Nettoyage NLP
+### Étape 2 — Nettoyage NLP (pipeline Kedro)
 
 ```bash
-python src/run_nlp_cleaning.py
+cd etl-bluesky
+kedro run --pipeline nlp_cleaning
 ```
 
-Nettoie le texte brut : suppression URLs, mentions, hashtags, emojis. Conserve les accents pour le français. Stocke dans `posts_clean`.
+Pipeline Kedro en 7 nodes orchestrés :
+1. **extract** — lecture MongoDB `posts_raw`
+2. **clean** — suppression URLs, mentions `@user`, hashtags `#tag`
+3. **detect_lang** — détection langue réelle via `langdetect` (filtre anglais)
+4. **normalize** — minuscules, suppression accents, filtrage ASCII
+5. **tokenize** — découpage NLTK `word_tokenize`, filtre min 3 tokens
+6. **lemmatize** — réduction à la forme canonique (NLTK WordNetLemmatizer)
+7. **load** — upsert dans MongoDB `posts_clean_kedro`
+
+Datasets intermédiaires sauvegardés en Parquet dans `etl-bluesky/data/`.
+
+Pour visualiser la pipeline :
+```bash
+cd etl-bluesky
+kedro viz run
+# → http://localhost:4141
+```
 
 ### Étape 3 — Classification fake news
 
@@ -237,6 +261,71 @@ Combine les signaux avec pondération :
 - **10%** risque émotion (colère/peur)
 
 Produit `final_credibility_score` (0–100), `final_alert_level` (low / medium / high) et `explanation_text` (phrase explicative humainement lisible).
+
+---
+
+## Pipeline Kedro (NLP)
+
+Le nettoyage NLP est implémenté comme un pipeline **Kedro** structuré dans `etl-bluesky/`.
+
+```
+MongoDB posts_raw
+      │
+      ▼ extract_raw_posts_node
+      │
+      ▼ clean_text_node          (URLs, mentions, hashtags)
+      │
+      ▼ detect_language_node     (langdetect → filtre anglais)
+      │
+      ▼ normalize_text_node      (lowercase, accents, ASCII)
+      │
+      ▼ tokenize_text_node       (NLTK word_tokenize)
+      │
+      ▼ lemmatize_text_node      (WordNetLemmatizer)
+      │
+      ▼ load_clean_posts_node
+      │
+MongoDB posts_clean_kedro
+```
+
+**Lancer le pipeline :**
+```bash
+cd etl-bluesky
+kedro run --pipeline nlp_cleaning
+```
+
+**Visualiser le graphe interactif :**
+```bash
+cd etl-bluesky
+kedro viz run
+# → http://localhost:4141
+```
+
+Les datasets intermédiaires (Parquet) et le rapport final (CSV) sont dans `etl-bluesky/data/`.
+
+---
+
+## Airflow (orchestration)
+
+Le DAG `bluesky_pipeline` orchestre le pipeline complet quotidiennement :
+
+```
+collect_bluesky  ──►  nlp_cleaning
+  (getapi.py)          (kedro run --pipeline nlp_cleaning)
+```
+
+**Schedule :** tous les jours à minuit (`0 0 * * *`).
+
+```bash
+# Démarrer Airflow
+export AIRFLOW_HOME=$PWD/airflow
+airflow standalone
+
+# Trigger manuel
+airflow dags trigger bluesky_pipeline
+```
+
+> Airflow nécessite Linux/macOS en production. Sur Windows, utiliser WSL2.
 
 ---
 
@@ -291,28 +380,37 @@ streamlit run src/dashboard_app.py
 
 ```
 Projet_Etude_M1_SDV/
+├── .github/workflows/ci.yml    ← CI/CD GitHub Actions (tests + lint)
 ├── run_all.py                  ← Lanceur unique du pipeline complet
 ├── requirements.txt            ← Dépendances Python
 ├── .env.example                ← Template de configuration
 ├── src/
-│   ├── getapi.py               ← Collecte Bluesky → MongoDB
-│   ├── nlp_cleaning.py         ← Module de nettoyage texte
-│   ├── run_nlp_cleaning.py     ← Batch nettoyage posts_raw → posts_clean
+│   ├── getapi.py               ← Collecte Bluesky Jetstream → MongoDB
+│   ├── run_nlp_cleaning.py     ← Nettoyage batch (legacy, remplacé par Kedro)
 │   ├── run_baseline.py         ← Entraînement + scoring fake news
 │   ├── emotion_analysis.py     ← Module analyse émotionnelle
 │   ├── run_emotion_analysis.py ← Batch analyse émotions
 │   ├── run_final_scoring.py    ← Score final + explainabilité
 │   └── dashboard_app.py        ← Dashboard Streamlit
+├── etl-bluesky/                ← Pipeline NLP Kedro
+│   ├── conf/base/
+│   │   ├── catalog.yml         ← Datasets Parquet + CSV
+│   │   └── parameters_nlp_cleaning.yml
+│   ├── src/etl_bluesky/pipelines/nlp_cleaning/
+│   │   ├── nodes.py            ← 7 fonctions pures (extract→load)
+│   │   └── pipeline.py         ← Graphe Kedro
+│   ├── tests/pipelines/nlp_cleaning/
+│   │   └── test_nodes.py       ← 25 tests unitaires
+│   └── data/                   ← Parquets intermédiaires (ignoré par git)
 ├── models/                     ← Modèles entraînés (ignoré par git)
-├── airflow/                    ← Orchestration Airflow (optionnel)
+├── airflow/
 │   ├── docker-compose.yaml
-│   └── dags/run_pipeline.py
-├── docs/
-│   ├── ARCHITECTURE_MVP_PARTIE_0.md
-│   ├── BACKLOG_MVP_PRIORISE.md
-│   └── PARTIE_1_COLLECTE_BLUESKY.md
-├── PLAN_ACTION_PROJET_THUMALIEN.md
-└── HANDOVER_CONTEXT.md         ← Contexte complet pour nouveaux contributeurs
+│   └── dags/
+│       └── bluesky_pipeline.py ← DAG : collecte → NLP (quotidien)
+└── docs/
+    ├── ARCHITECTURE_MVP_PARTIE_0.md
+    ├── DOCUMENTATION_TECHNIQUE_PROJET.md
+    └── PARTIE_1_COLLECTE_BLUESKY.md
 ```
 
 ---
