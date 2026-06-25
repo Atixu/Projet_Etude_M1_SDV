@@ -39,58 +39,42 @@
 # (transcoding), templating and a way to reuse arguments that are frequently repeated. See more here:
 # https://docs.kedro.org/en/stable/data/data_catalog.html
 
-companies:
+
+# =============================================================================
+# Pipeline nlp_cleaning — datasets Bluesky fake news
+# =============================================================================
+
+# Étape 1 : Posts bruts extraits de MongoDB (en mémoire, pas persisté sur disque)
+raw_posts_df:
+  type: pandas.ParquetDataset
+  filepath: data/01_raw/raw_posts.parquet
+
+# Étape 2 : Après suppression URLs, mentions, hashtags
+cleaned_posts_df:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/cleaned_posts.parquet
+
+# Étape 3 : Après filtre de langue (anglais uniquement)
+lang_filtered_df:
+  type: pandas.ParquetDataset
+  filepath: data/02_intermediate/lang_filtered.parquet
+
+# Étape 4 : Après normalisation (minuscules, ASCII, suppression accents)
+normalized_posts_df:
+  type: pandas.ParquetDataset
+  filepath: data/03_primary/normalized_posts.parquet
+
+# Étape 5 : Après tokenisation (colonne tokens + token_count)
+tokenized_posts_df:
+  type: pandas.ParquetDataset
+  filepath: data/04_feature/tokenized_posts.parquet
+
+# Étape 6 : Après lemmatisation (colonne lemmatized_tokens + clean_text)
+lemmatized_posts_df:
+  type: pandas.ParquetDataset
+  filepath: data/05_model_input/lemmatized_posts.parquet
+
+# Étape 7 : Résumé du chargement MongoDB
+nlp_pipeline_summary:
   type: pandas.CSVDataset
-  filepath: data/01_raw/companies.csv
-
-reviews:
-  type: pandas.CSVDataset
-  filepath: data/01_raw/reviews.csv
-
-shuttles:
-  type: pandas.ExcelDataset
-  filepath: data/01_raw/shuttles.xlsx
-  load_args:
-    engine: openpyxl
-
-preprocessed_companies:
-  type: pandas.ParquetDataset
-  filepath: data/02_intermediate/preprocessed_companies.parquet
-
-preprocessed_shuttles:
-  type: pandas.ParquetDataset
-  filepath: data/02_intermediate/preprocessed_shuttles.parquet
-
-model_input_table:
-  type: pandas.ParquetDataset
-  filepath: data/03_primary/model_input_table.parquet
-
-regressor:
-  type: pickle.PickleDataset
-  filepath: data/06_models/regressor.pickle
-  versioned: true
-
-shuttle_passenger_capacity_plot_exp:
-  type: plotly.PlotlyDataset
-  filepath: data/08_reporting/shuttle_passenger_capacity_plot_exp.json
-  versioned: true
-  plotly_args:
-    type: bar
-    fig:
-      x: shuttle_type
-      y: passenger_capacity
-      orientation: h
-    layout:
-      xaxis_title: Shuttles
-      yaxis_title: Average passenger capacity
-      title: Shuttle Passenger capacity
-
-shuttle_passenger_capacity_plot_go:
-  type: plotly.JSONDataset
-  filepath: data/08_reporting/shuttle_passenger_capacity_plot_go.json
-  versioned: true
-
-dummy_confusion_matrix:
-  type: matplotlib.MatplotlibDataset
-  filepath: data/08_reporting/dummy_confusion_matrix.png
-  versioned: true
+  filepath: data/08_reporting/nlp_pipeline_summary.csv

@@ -1,15 +1,19 @@
-"""Project pipelines."""
+"""Project pipelines — registre des pipelines Kedro."""
 
-from kedro.framework.project import find_pipelines
 from kedro.pipeline import Pipeline
+
+from etl_bluesky.pipelines.nlp_cleaning import create_pipeline as nlp_pipeline
 
 
 def register_pipelines() -> dict[str, Pipeline]:
-    """Register the project's pipelines.
+    """Enregistre les pipelines du projet.
 
     Returns:
-        A mapping from pipeline names to ``Pipeline`` objects.
+        Dictionnaire {nom: Pipeline}.
     """
-    pipelines = find_pipelines(raise_errors=True)
-    pipelines["__default__"] = sum(pipelines.values())
-    return pipelines
+    nlp_cleaning = nlp_pipeline()
+
+    return {
+        "nlp_cleaning": nlp_cleaning,
+        "__default__": nlp_cleaning,
+    }

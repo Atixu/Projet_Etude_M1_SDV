@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  test:
+    name: Tests unitaires NLP pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install root dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install NLP / Kedro dependencies
+        run: |
+          pip install langdetect>=1.0.9 nltk>=3.8 pytest>=8.0
+          pip install "kedro~=1.2.0" "kedro-datasets[pandas-parquetdataset,pandas-csvdataset]>=3.0"
+          pip install pymongo>=4.6.0
+          cd etl-bluesky && pip install -e . --quiet
+
+      - name: Download NLTK data
+        run: python -c "import nltk; nltk.download('punkt_tab', quiet=True); nltk.download('wordnet', quiet=True)"
+
+      - name: Run tests
+        run: |
+          cd etl-bluesky
+          python -m pytest tests/pipelines/nlp_cleaning/ -v
+
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - name: Lint src/
+        run: ruff check src/ --select E,F,W --ignore E501
+      - name: Lint etl-bluesky/src/
+        run: ruff check etl-bluesky/src/ --select E,F,W --ignore E501

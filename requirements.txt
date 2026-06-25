@@ -1,12 +1,33 @@
+# ── Collecte & stockage ───────────────────────────────────────────────────────
 requests>=2.31.0
 pymongo>=4.6.0
 python-dotenv>=1.0.1
+
+# ── NLP & ML ──────────────────────────────────────────────────────────────────
 scikit-learn>=1.5.0
 datasets>=4.8.0
 joblib>=1.4.0
+nltk>=3.8
+langdetect>=1.0.9
+
+# ── Analyse émotionnelle ──────────────────────────────────────────────────────
 vaderSentiment>=3.3.2
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
 streamlit>=1.36.0
 pandas>=2.2.0
 plotly>=5.24.0
+
+# ── Agent IA ──────────────────────────────────────────────────────────────────
 groq>=0.9.0
+
+# ── Monitoring & green IT ─────────────────────────────────────────────────────
 codecarbon>=2.3.0
+
+# ── Pipeline Kedro ────────────────────────────────────────────────────────────
+kedro~=1.2.0
+kedro-datasets[pandas-parquetdataset,pandas-csvdataset]>=3.0
+
+# ── Orchestration Airflow ─────────────────────────────────────────────────────
+apache-airflow>=2.9.0
+apache-airflow-providers-standard>=1.0.0

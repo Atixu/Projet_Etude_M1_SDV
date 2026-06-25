@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
+from langdetect import detect, LangDetectException
 from pymongo import MongoClient, UpdateOne
 from pymongo.errors import BulkWriteError
 
@@ -54,8 +55,11 @@ def _required_env(name: str) -> str:
     return value
 
 
-def _build_clean_doc(raw_doc: dict[str, Any], cleaned_at: str) -> dict[str, Any] | None:
-    """Transforme un document brut en document clean. Retourne None si texte vide."""
+def _build_clean_doc(
+    raw_doc: dict[str, Any],
+    cleaned_at: str,
+) -> dict[str, Any] | None:
+    """Transforme un document brut en document clean. Retourne None si non-anglais ou texte vide."""
     post = raw_doc.get("post", {})
     record = post.get("record", {})
     author = post.get("author", {})
@@ -69,7 +73,15 @@ def _build_clean_doc(raw_doc: dict[str, Any], cleaned_at: str) -> dict[str, Any]
     langs = record.get("langs") or []
     lang = extract_lang(langs)
 
-    cleaned = clean_text(text, lang=lang)
+    # Verifier la langue reelle du texte (le champ langs est declare par l'utilisateur, pas fiable)
+    try:
+        detected = detect(text)
+    except LangDetectException:
+        return None
+    if detected != "en":
+        return None
+
+    cleaned = clean_text(text, lang="en")
     tokens = token_count(cleaned)
 
     return {
@@ -94,7 +106,7 @@ def _build_clean_doc(raw_doc: dict[str, Any], cleaned_at: str) -> dict[str, Any]
         "repost_count": post.get("repostCount", 0),
         "bookmark_count": post.get("bookmarkCount", 0),
         # Contexte de collecte
-        "search_term": feed_ctx.get("search_term"),
+        "feed_uri": feed_ctx.get("feed_uri"),
         "collected_at": feed_ctx.get("collected_at"),
         # Pipeline
         "pipeline": PIPELINE_VERSION,
@@ -139,7 +151,7 @@ def main() -> None:
 
     total_raw = raw_col.count_documents({})
     logging.info(
-        "Start NLP cleaning: raw_docs=%s batch_size=%s -> %s",
+        "Start NLP cleaning: raw_docs=%s batch_size=%s lang=en -> %s",
         total_raw, batch_size, clean_col_name,
     )
 

@@ -1,0 +1,14 @@
+# Paramètres du pipeline NLP Cleaning
+# Kedro charge automatiquement ce fichier pour le pipeline nlp_cleaning
+
+mongo_uri: "mongodb://localhost:27017"
+database: "bluesky"
+raw_collection: "posts_raw"
+clean_collection: "posts_clean_kedro"
+
+# Nettoyage
+min_token_count: 3          # Nombre minimum de tokens pour garder un post
+target_lang: "en"           # Langue cible (seuls les posts détectés dans cette langue sont gardés)
+
+# Lemmatisation
+use_nltk_lemmatizer: true   # Utiliser NLTK WordNetLemmatizer (false = simple split)
