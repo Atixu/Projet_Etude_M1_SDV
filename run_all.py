@@ -79,13 +79,13 @@ def banner(text: str) -> None:
     print(f"{BOLD}{CYAN}{'='*60}{RESET}\n")
 
 def ok(text: str) -> None:
-    print(f"{GREEN}✔  {text}{RESET}")
+    print(f"{GREEN}[OK] {text}{RESET}")
 
 def warn(text: str) -> None:
-    print(f"{YELLOW}⚠  {text}{RESET}")
+    print(f"{YELLOW}[!]  {text}{RESET}")
 
 def err(text: str) -> None:
-    print(f"{RED}✖  {text}{RESET}")
+    print(f"{RED}[X]  {text}{RESET}")
 
 def check_env() -> bool:
     env_file = ROOT / ".env"
@@ -110,7 +110,7 @@ def check_mongo() -> bool:
 
 def run_step(step: dict) -> bool:
     label = step["label"]
-    print(f"\n{BOLD}▶  {label}{RESET}")
+    print(f"\n{BOLD}>>  {label}{RESET}")
     t0 = time.time()
 
     if "cmd" in step:
