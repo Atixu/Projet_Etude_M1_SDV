@@ -19,6 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 SRC = ROOT / "src"
+ETL = ROOT / "etl-bluesky"
 
 STEPS = [
     {
@@ -29,8 +30,16 @@ STEPS = [
     },
     {
         "id": "clean",
-        "label": "Nettoyage NLP → MongoDB (posts_clean)",
-        "script": SRC / "run_nlp_cleaning.py",
+        "label": "Nettoyage NLP → MongoDB (posts_clean_kedro) — Kedro pipeline",
+        "cmd": ["kedro", "run", "--pipeline", "nlp_cleaning"],
+        "cwd": ETL,
+        "env_extra": {"PYTHONUTF8": "1"},
+        "skip_flag": None,
+    },
+    {
+        "id": "claim",
+        "label": "Filtre affirmations factuelles (claim detection)",
+        "script": SRC / "run_claim_filter.py",
         "skip_flag": None,
     },
     {
@@ -99,13 +108,25 @@ def check_mongo() -> bool:
         print(f"  → Lance : {YELLOW}docker run -d --name m1-mongo -p 27017:27017 mongo:7{RESET}")
         return False
 
-def run_step(script: Path, label: str) -> bool:
+def run_step(step: dict) -> bool:
+    label = step["label"]
     print(f"\n{BOLD}▶  {label}{RESET}")
     t0 = time.time()
-    result = subprocess.run(
-        [sys.executable, str(script)],
-        cwd=str(ROOT),
-    )
+
+    if "cmd" in step:
+        env = os.environ.copy()
+        env.update(step.get("env_extra", {}))
+        result = subprocess.run(
+            step["cmd"],
+            cwd=str(step.get("cwd", ROOT)),
+            env=env,
+        )
+    else:
+        result = subprocess.run(
+            [sys.executable, str(step["script"])],
+            cwd=str(ROOT),
+        )
+
     elapsed = time.time() - t0
     if result.returncode == 0:
         ok(f"Terminé en {elapsed:.1f}s")
@@ -146,7 +167,7 @@ def main() -> None:
             warn(f"Étape ignorée (--skip-collect) : {step['label']}")
             continue
 
-        success = run_step(step["script"], step["label"])
+        success = run_step(step)
         if not success:
             failures.append(step["label"])
             err("Pipeline interrompu.")

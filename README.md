@@ -52,9 +52,9 @@ Bluesky API
     │  searchPosts (mots-clés FR/EN)
     ▼
 MongoDB posts_raw          ← getapi.py
-    │  nettoyage texte
+    │  nettoyage texte (Kedro, 7 nodes)
     ▼
-MongoDB posts_clean         ← run_nlp_cleaning.py
+MongoDB posts_clean_kedro   ← kedro run --pipeline nlp_cleaning
     │  TF-IDF + LogReg
     ▼
 credibility_score           ← run_baseline.py
@@ -386,7 +386,6 @@ Projet_Etude_M1_SDV/
 ├── .env.example                ← Template de configuration
 ├── src/
 │   ├── getapi.py               ← Collecte Bluesky Jetstream → MongoDB
-│   ├── run_nlp_cleaning.py     ← Nettoyage batch (legacy, remplacé par Kedro)
 │   ├── run_baseline.py         ← Entraînement + scoring fake news
 │   ├── emotion_analysis.py     ← Module analyse émotionnelle
 │   ├── run_emotion_analysis.py ← Batch analyse émotions
